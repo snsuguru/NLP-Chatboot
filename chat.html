@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Gemini Chatbot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🤖 Gemini Chatbot</h1>
+      <button id="resetBtn" title="Clear conversation">Reset</button>
+    </header>
+
+    <main id="chat">
+      {% for turn in history %}
+        {% if turn.role == 'user' %}
+          <div class="msg user"><div class="bubble">{{ turn.text }}</div></div>
+        {% else %}
+          <div class="msg bot"><div class="bubble">{{ turn.text|safe }}</div></div>
+        {% endif %}
+      {% endfor %}
+    </main>
+
+    <form id="composer">
+      <input id="message" type="text" placeholder="Type your message..." autocomplete="off" autofocus>
+      <button type="submit">Send</button>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('composer');
+    const input = document.getElementById('message');
+    const chat = document.getElementById('chat');
+    const resetBtn = document.getElementById('resetBtn');
+
+    function appendMessage(text, who) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'msg ' + (who === 'user' ? 'user' : 'bot');
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.innerText = text;
+      wrapper.appendChild(bubble);
+      chat.appendChild(wrapper);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      appendMessage(text, 'user');
+      input.value = '';
+      input.focus();
+
+      try {
+        const resp = await fetch('/chat', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({message: text})
+        });
+        const data = await resp.json();
+        if (data.reply) {
+          appendMessage(data.reply, 'bot');
+        } else {
+          appendMessage(data.error || 'Unexpected error', 'bot');
+        }
+      } catch (err) {
+        appendMessage('Network error: ' + err, 'bot');
+      }
+    });
+
+    resetBtn.addEventListener('click', async () => {
+      await fetch('/reset', {method: 'POST'});
+      chat.innerHTML = '';
+      appendMessage('Conversation reset.', 'bot');
+    });
+  </script>
+</body>
+</html>
